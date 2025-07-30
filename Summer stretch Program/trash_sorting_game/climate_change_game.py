@@ -8,8 +8,8 @@ pygame.mixer.init()
 pygame.mixer.music.load("elevator_music.wav")  # Update path if needed
 pygame.mixer.music.set_volume(0.5)
 pygame.mixer.music.play(-1)  # Loop indefinitely
-pygame.mixer.Sound("Incorrect_sound.wav")
-pygame.mixer.Sound("Cocorrect_sound.wav")
+x_sound = pygame.mixer.Sound("Incorrect_sound.wav")
+check_sound = pygame.mixer.Sound("Correct_sound.wav")
 
 # Trash logic
 trash_item = {
@@ -40,12 +40,21 @@ def spawn_item():
     location_y = random.randint(1, 400)
     rect = image.get_rect(topleft=(location_x, location_y))
     return item, image, rect
+
+
 def spawn_answer():
     correct = pygame.image.load("check.png")
     incorrect = pygame.image.load("x.png")
-    check = image.get_rect(topleft=(250, 250))
-    x = image.get_rect(topleft=(250, 250))
+
+    # Scale icons to a readable size
+    correct = pygame.transform.scale(correct, (60, 60))
+    incorrect = pygame.transform.scale(incorrect, (60, 60))
+
+    # Fixed central position
+    check = correct.get_rect(center=(350, 300))
+    x = incorrect.get_rect(center=(350, 300))
     return correct, incorrect, check, x
+
 
 # Setup
 screen = pygame.display.set_mode((700, 600))
@@ -114,14 +123,23 @@ while running:
             if image_rect.colliderect(button_tra):
                 if trash_item[item_spawned] == "trash":
                     score += 1
+                    show_y = True
+                elif trash_item[item_spawned] != "trash":
+                    show_x = True
                 item_spawned, image, image_rect = spawn_item()
             elif image_rect.colliderect(button_recy):
                 if trash_item[item_spawned] == "recycle":
                     score += 1
+                    show_y = True
+                elif trash_item[item_spawned] != "recycle":
+                    show_x = True
                 item_spawned, image, image_rect = spawn_item()
             elif image_rect.colliderect(button_comp):
                 if trash_item[item_spawned] == "compost":
                     score += 1
+                    show_y = True
+                elif trash_item[item_spawned] != "compost":
+                    show_x = True
                 item_spawned, image, image_rect = spawn_item()
 
         elif event.type == pygame.MOUSEMOTION and dragging:
@@ -145,8 +163,13 @@ while running:
     screen.blit(timer_surface, (20, 20))
     screen.blit(score_surface, (560, 20))
     if show_x == True:
-        screen.blit()
-        pygame.mixer.Sound.play()
+        screen.blit(incorrect,x)
+        x_sound.play()
+        show_x = False
+    elif show_y == True:
+        screen.blit(correct,check)
+        check_sound.play()
+        show_y = False
 
 
     pygame.display.flip()
