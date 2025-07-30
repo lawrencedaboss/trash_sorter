@@ -1,15 +1,21 @@
-import pygame, random, threading, time
+import pygame, random, threading, time, os
+
+BASE_DIR = os.path.dirname(__file__)
+
 
 # Initialize Pygame and mixer
 pygame.init()
 pygame.mixer.init()
 
 # Load and play background music
-pygame.mixer.music.load("elevator_music.wav")  # Update path if needed
+pygame.mixer.music.load(os.path.join(BASE_DIR, "elevator_music.wav"))
+
+  # Update path if needed
 pygame.mixer.music.set_volume(0.5)
 pygame.mixer.music.play(-1)  # Loop indefinitely
-x_sound = pygame.mixer.Sound("Incorrect_sound.wav")
-check_sound = pygame.mixer.Sound("Correct_sound.wav")
+x_sound = pygame.mixer.Sound(os.path.join(BASE_DIR, "Incorrect_sound.wav"))
+check_sound = pygame.mixer.Sound(os.path.join(BASE_DIR, "Correct_sound.wav"))
+
 
 # Trash logic
 trash_item = {
@@ -33,7 +39,7 @@ trash_item_choice = {
 def spawn_item():
     choice = random.randint(1, 6)
     item = trash_item_choice[choice]
-    image = pygame.image.load(item)
+    image = pygame.image.load(os.path.join(BASE_DIR, item))
     width, height = image.get_size()
     image = pygame.transform.scale(image, (width // 9, height // 9))
     location_x = random.randint(1, 500)
@@ -43,8 +49,8 @@ def spawn_item():
 
 
 def spawn_answer():
-    correct = pygame.image.load("check.png")
-    incorrect = pygame.image.load("x.png")
+    correct = pygame.image.load(os.path.join(BASE_DIR, "check.png"))
+    incorrect = pygame.image.load(os.path.join(BASE_DIR, "x.png"))
 
     # Scale icons to a readable size
     correct = pygame.transform.scale(correct, (60, 60))
