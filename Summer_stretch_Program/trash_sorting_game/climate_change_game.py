@@ -2,24 +2,21 @@ import pygame, random, threading, time, os
 
 BASE_DIR = os.path.dirname(__file__)
 
-
 # Initialize Pygame and mixer
 pygame.init()
 pygame.mixer.init()
 
 # Load and play background music
 pygame.mixer.music.load(os.path.join(BASE_DIR, "elevator_music.wav"))
-
-  # Update path if needed
 pygame.mixer.music.set_volume(0.5)
-pygame.mixer.music.play(-1)  # Loop indefinitely
+pygame.mixer.music.play(-1)
+
 x_sound = pygame.mixer.Sound(os.path.join(BASE_DIR, "Incorrect_sound.wav"))
 check_sound = pygame.mixer.Sound(os.path.join(BASE_DIR, "Correct_sound.wav"))
 
-
 # Trash logic
 trash_item = {
-    "banana.png": "trash",
+    "banana.png": "compost",
     "plastic_water_bottle.png": "recycle",
     "apple_core.png": "compost",
     "can.png": "recycle",
@@ -27,40 +24,37 @@ trash_item = {
     "pizza_box.png": "trash",
 }
 
-trash_item_choice = {
-    1: "banana.png",
-    2: "plastic_water_bottle.png",
-    3: "apple_core.png",
-    4: "can.png",
-    5: "carboard_box.png",
-    6: "pizza_box.png",
-}
+trash_item_choice = {i + 1: key for i, key in enumerate(trash_item)}
 
 def spawn_item():
     choice = random.randint(1, 6)
-    item = trash_item_choice[choice]
-    image = pygame.image.load(os.path.join(BASE_DIR, item))
+    item_name = trash_item_choice[choice]
+    item_type = trash_item[item_name]
+    image = pygame.image.load(os.path.join(BASE_DIR, item_name))
     width, height = image.get_size()
     image = pygame.transform.scale(image, (width // 9, height // 9))
     location_x = random.randint(1, 500)
     location_y = random.randint(1, 400)
     rect = image.get_rect(topleft=(location_x, location_y))
-    return item, image, rect
 
+    return {
+        "name": item_name,
+        "type": item_type,
+        "surface": image,
+        "rect": rect,
+        "dragging": False,
+        "offset_x": 0,
+        "offset_y": 0
+    }
 
 def spawn_answer():
     correct = pygame.image.load(os.path.join(BASE_DIR, "check.png"))
     incorrect = pygame.image.load(os.path.join(BASE_DIR, "x.png"))
-
-    # Scale icons to a readable size
-    correct = pygame.transform.scale(correct, (60, 60))
-    incorrect = pygame.transform.scale(incorrect, (60, 60))
-
-    # Fixed central position
+    correct = pygame.transform.scale(correct, (100, 100))
+    incorrect = pygame.transform.scale(incorrect, (100, 100))
     check = correct.get_rect(center=(350, 300))
     x = incorrect.get_rect(center=(350, 300))
     return correct, incorrect, check, x
-
 
 # Setup
 screen = pygame.display.set_mode((700, 600))
@@ -68,13 +62,16 @@ clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 40)
 pygame.display.set_caption("Trash Sorter Game")
 
-
-items = []  # Shared list of items
-
+items = []
 lock = threading.Lock()
 
+# Feedback State
+feedback_start_time = 0
+feedback_duration = 600  # milliseconds
+feedback_type = None  # "correct" or "incorrect"
+
 def item_spawner():
-    while running:  # Will need to be global
+    while running:
         with lock:
             new_item = spawn_item()
             items.append(new_item)
@@ -92,17 +89,13 @@ def draw_button(text, rect, color):
     screen.blit(txt_surface, txt_rect)
 
 # Game State
-item_spawned, image, image_rect = spawn_item()
 correct, incorrect, check, x = spawn_answer()
-
 score = 0
 start_ticks = pygame.time.get_ticks()
-dragging = False
-offset_x = 0
-offset_y = 0
+dragged_item = None
 running = True
-show_x = False
-show_y = False
+spawner_thread = threading.Thread(target=item_spawner)
+spawner_thread.start()
 
 # Game Loop
 while running:
@@ -114,69 +107,87 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        
+
         elif event.type == pygame.MOUSEBUTTONDOWN:
-            if image_rect.collidepoint(event.pos):
-                dragging = True
-                mouse_x, mouse_y = event.pos
-                offset_x = image_rect.x - mouse_x
-                offset_y = image_rect.y - mouse_y
+            with lock:
+                for item in reversed(items):
+                    if item["rect"].collidepoint(event.pos):
+                        item["dragging"] = True
+                        mouse_x, mouse_y = event.pos
+                        item["offset_x"] = item["rect"].x - mouse_x
+                        item["offset_y"] = item["rect"].y - mouse_y
+                        dragged_item = item
+                        break
 
-        elif event.type == pygame.MOUSEBUTTONUP:
-            dragging = False
+        elif event.type == pygame.MOUSEBUTTONUP and dragged_item:
+            dragged_item["dragging"] = False
+            item_type = dragged_item["type"]
+            item_rect = dragged_item["rect"]
 
-            # Check drop zones on button release
-            if image_rect.colliderect(button_tra):
-                if trash_item[item_spawned] == "trash":
-                    score += 1
-                    show_y = True
-                elif trash_item[item_spawned] != "trash":
-                    show_x = True
-                item_spawned, image, image_rect = spawn_item()
-            elif image_rect.colliderect(button_recy):
-                if trash_item[item_spawned] == "recycle":
-                    score += 1
-                    show_y = True
-                elif trash_item[item_spawned] != "recycle":
-                    show_x = True
-                item_spawned, image, image_rect = spawn_item()
-            elif image_rect.colliderect(button_comp):
-                if trash_item[item_spawned] == "compost":
-                    score += 1
-                    show_y = True
-                elif trash_item[item_spawned] != "compost":
-                    show_x = True
-                item_spawned, image, image_rect = spawn_item()
+            feedback_start_time = pygame.time.get_ticks()
 
-        elif event.type == pygame.MOUSEMOTION and dragging:
+            if item_rect.colliderect(button_tra):
+                if item_type == "trash":
+                    score += 1
+                    feedback_type = "correct"
+                    check_sound.play()
+                else:
+                    feedback_type = "incorrect"
+                    x_sound.play()
+                with lock:
+                    items.remove(dragged_item)
+
+            elif item_rect.colliderect(button_recy):
+                if item_type == "recycle":
+                    score += 1
+                    feedback_type = "correct"
+                    check_sound.play()
+                else:
+                    feedback_type = "incorrect"
+                    x_sound.play()
+                with lock:
+                    items.remove(dragged_item)
+
+            elif item_rect.colliderect(button_comp):
+                if item_type == "compost":
+                    score += 1
+                    feedback_type = "correct"
+                    check_sound.play()
+                else:
+                    feedback_type = "incorrect"
+                    x_sound.play()
+                with lock:
+                    items.remove(dragged_item)
+
+            dragged_item = None
+
+        elif event.type == pygame.MOUSEMOTION and dragged_item:
             mouse_x, mouse_y = event.pos
-            image_rect.x = mouse_x + offset_x
-            image_rect.y = mouse_y + offset_y
+            dragged_item["rect"].x = mouse_x + dragged_item["offset_x"]
+            dragged_item["rect"].y = mouse_y + dragged_item["offset_y"]
 
-    # Draw trash item
-    screen.blit(image, image_rect)
+    # Draw items
+    with lock:
+        for item in items:
+            screen.blit(item["surface"], item["rect"])
 
     # Timer and score display
     seconds = (pygame.time.get_ticks() - start_ticks) // 1000
-    remaining = max(0, 120 - seconds)
-    mins = remaining // 60
-    secs = remaining % 60
-    timer_text = f"{mins}:{secs:02d}"
+    remaining = max(0, 60 - seconds)
+    timer_text = f"{remaining // 60}:{remaining % 60:02d}"
     score_text = f"Score: {score}"
 
     timer_surface = font.render(f"Time: {timer_text}", True, (0, 0, 0))
     score_surface = font.render(score_text, True, (0, 0, 0))
     screen.blit(timer_surface, (20, 20))
     screen.blit(score_surface, (560, 20))
-    if show_x == True:
-        screen.blit(incorrect,x)
-        x_sound.play()
-        show_x = False
-    elif show_y == True:
-        screen.blit(correct,check)
-        check_sound.play()
-        show_y = False
 
+    # Show feedback if within duration
+    current_time = pygame.time.get_ticks()
+    if feedback_type == "correct" and current_time - feedback_start_time < feedback_duration:
+        screen.blit(correct, check)
+    elif feedback_type == "incorrect" and current_time - feedback_start_time < feedback_duration:
+        screen.blit(incorrect, x)
 
     pygame.display.flip()
     clock.tick(60)
