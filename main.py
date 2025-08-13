@@ -1,6 +1,6 @@
-import pygame, random, os, sys
+import pygame, random, os, sys, asyncio
 
-def main():
+async def main():
     pygame.init()
     pygame.mixer.init()
 
@@ -8,8 +8,8 @@ def main():
     ASSET_IMG_PATH = os.path.join(SCRIPT_DIR, "assets", "images")
     ASSET_AUDIO_PATH = os.path.join(SCRIPT_DIR, "assets", "audio")
 
-    # ✅ Use OGG format for browser compatibility
-    bg_music_path = os.path.join(ASSET_AUDIO_PATH, "elevator_music.ogg")
+    # Load audio paths (play after user click)
+    bg_music_path = os.path.join(ASSET_AUDIO_PATH, "elevator_music.ogg")  # Use OGG for pygbag
     x_sound = pygame.mixer.Sound(os.path.join(ASSET_AUDIO_PATH, "Incorrect_sound.ogg"))
     check_sound = pygame.mixer.Sound(os.path.join(ASSET_AUDIO_PATH, "Correct_sound.ogg"))
 
@@ -135,7 +135,7 @@ def main():
                         item_rect = dragged_item["rect"]
                         feedback_start_time = pygame.time.get_ticks()
                         feedback_type = None
-                        remove_item = False  # ✅ Only remove if dropped in a bin
+                        remove_item = False
 
                         if item_rect.colliderect(button_tra):
                             feedback_type = "correct" if item_type == "trash" else "incorrect"
@@ -192,11 +192,11 @@ def main():
 
         pygame.display.flip()
         clock.tick(60)
+        await asyncio.sleep(0)  # This keeps browser build responsive
 
-    # ✅ Skip pygame.quit() in browser
     if "pyodide" not in sys.modules:
         pygame.quit()
     print("Game ended.")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
