@@ -1,23 +1,18 @@
-import pygame, random, threading, time, os
+import pygame, random, os, sys
 
 def main():
     pygame.init()
     pygame.mixer.init()
 
-    # 🗂️ Use absolute asset paths based on script location
     SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
     ASSET_IMG_PATH = os.path.join(SCRIPT_DIR, "assets", "images")
     ASSET_AUDIO_PATH = os.path.join(SCRIPT_DIR, "assets", "audio")
 
-    # 🎵 Load audio assets
-    pygame.mixer.music.load(os.path.join(ASSET_AUDIO_PATH, "elevator_music.wav"))
-    pygame.mixer.music.set_volume(0.5)
-    pygame.mixer.music.play(-1)
+    # ✅ Use OGG format for browser compatibility
+    bg_music_path = os.path.join(ASSET_AUDIO_PATH, "elevator_music.ogg")
+    x_sound = pygame.mixer.Sound(os.path.join(ASSET_AUDIO_PATH, "Incorrect_sound.ogg"))
+    check_sound = pygame.mixer.Sound(os.path.join(ASSET_AUDIO_PATH, "Correct_sound.ogg"))
 
-    x_sound = pygame.mixer.Sound(os.path.join(ASSET_AUDIO_PATH, "Incorrect_sound.wav"))
-    check_sound = pygame.mixer.Sound(os.path.join(ASSET_AUDIO_PATH, "Correct_sound.wav"))
-
-    # 🗑️ Trash logic
     trash_item = {
         "banana.png": "compost",
         "plastic_water_bottle.png": "recycle",
@@ -63,7 +58,6 @@ def main():
     pygame.display.set_caption("Trash Sorter Game")
 
     items = []
-    lock = threading.Lock()
     running = True
     game = False
     show_start_screen = True
@@ -84,28 +78,20 @@ def main():
 
     def draw_start_screen():
         screen.fill((200, 225, 255))
-        screen.blit(font.render("Welcome to Trash Sorter!", True, (0, 0, 0)),
-                    font.render("Welcome to Trash Sorter!", True, (0, 0, 0)).get_rect(center=(350, 150)))
-        screen.blit(font.render("Sort items into trash, recycle, or compost.", True, (50, 50, 50)),
-                    font.render("Sort items into trash, recycle, or compost.", True, (50, 50, 50)).get_rect(center=(350, 220)))
+        title_text = font.render("Welcome to Trash Sorter!", True, (0, 0, 0))
+        instructions_text = font.render("Sort items into trash, recycle, or compost.", True, (50, 50, 50))
+        screen.blit(title_text, title_text.get_rect(center=(350, 150)))
+        screen.blit(instructions_text, instructions_text.get_rect(center=(350, 220)))
         pygame.draw.rect(screen, (0, 100, 200), start_button)
-        screen.blit(font.render("Start Game", True, (255, 255, 255)),
-                    font.render("Start Game", True, (255, 255, 255)).get_rect(center=start_button.center))
+        start_text = font.render("Start Game", True, (255, 255, 255))
+        screen.blit(start_text, start_text.get_rect(center=start_button.center))
 
     correct, incorrect, check, x = spawn_answer()
     score = 0
     start_ticks = 0
     dragged_item = None
-
-    def item_spawner():
-        while running:
-            if game:
-                with lock:
-                    items.append(spawn_item())
-                time.sleep(2)
-
-    spawner_thread = threading.Thread(target=item_spawner)
-    spawner_thread.start()
+    last_spawn_time = 0
+    spawn_interval = 2000  # milliseconds
 
     while running:
         screen.fill((255, 255, 255))
@@ -120,6 +106,9 @@ def main():
                         show_start_screen = False
                         game = True
                         start_ticks = pygame.time.get_ticks()
+                        pygame.mixer.music.load(bg_music_path)
+                        pygame.mixer.music.set_volume(0.5)
+                        pygame.mixer.music.play(-1)
 
         else:
             draw_button("trash", button_tra, (0, 0, 0))
@@ -132,28 +121,31 @@ def main():
 
                 if game:
                     if event.type == pygame.MOUSEBUTTONDOWN:
-                        with lock:
-                            for item in reversed(items):
-                                if item["rect"].collidepoint(event.pos):
-                                    item["dragging"] = True
-                                    mouse_x, mouse_y = event.pos
-                                    item["offset_x"] = item["rect"].x - mouse_x
-                                    item["offset_y"] = item["rect"].y - mouse_y
-                                    dragged_item = item
-                                    break
+                        for item in reversed(items):
+                            if item["rect"].collidepoint(event.pos):
+                                item["dragging"] = True
+                                mouse_x, mouse_y = event.pos
+                                item["offset_x"] = item["rect"].x - mouse_x
+                                item["offset_y"] = item["rect"].y - mouse_y
+                                dragged_item = item
+                                break
 
                     elif event.type == pygame.MOUSEBUTTONUP and dragged_item:
                         item_type = dragged_item["type"]
                         item_rect = dragged_item["rect"]
                         feedback_start_time = pygame.time.get_ticks()
                         feedback_type = None
+                        remove_item = False  # ✅ Only remove if dropped in a bin
 
                         if item_rect.colliderect(button_tra):
                             feedback_type = "correct" if item_type == "trash" else "incorrect"
+                            remove_item = True
                         elif item_rect.colliderect(button_recy):
                             feedback_type = "correct" if item_type == "recycle" else "incorrect"
+                            remove_item = True
                         elif item_rect.colliderect(button_comp):
                             feedback_type = "correct" if item_type == "compost" else "incorrect"
+                            remove_item = True
 
                         if feedback_type == "correct":
                             check_sound.play()
@@ -161,9 +153,9 @@ def main():
                         elif feedback_type == "incorrect":
                             x_sound.play()
 
-                        with lock:
-                            if dragged_item in items:
-                                items.remove(dragged_item)
+                        if remove_item and dragged_item in items:
+                            items.remove(dragged_item)
+
                         dragged_item = None
 
                     elif event.type == pygame.MOUSEMOTION and dragged_item:
@@ -172,9 +164,13 @@ def main():
                         dragged_item["rect"].y = mouse_y + dragged_item["offset_y"]
 
             if game:
-                with lock:
-                    for item in items:
-                        screen.blit(item["surface"], item["rect"])
+                current_time = pygame.time.get_ticks()
+                if current_time - last_spawn_time >= spawn_interval:
+                    items.append(spawn_item())
+                    last_spawn_time = current_time
+
+                for item in items:
+                    screen.blit(item["surface"], item["rect"])
 
                 seconds = (pygame.time.get_ticks() - start_ticks) // 1000
                 remaining = max(0, 60 - seconds)
@@ -182,7 +178,6 @@ def main():
                 screen.blit(font.render(f"Time: {timer_text}", True, (0, 0, 0)), (20, 20))
                 screen.blit(font.render(f"Score: {score}", True, (0, 0, 0)), (560, 20))
 
-                current_time = pygame.time.get_ticks()
                 if feedback_type == "correct" and current_time - feedback_start_time < feedback_duration:
                     screen.blit(correct, check)
                 elif feedback_type == "incorrect" and current_time - feedback_start_time < feedback_duration:
@@ -198,9 +193,10 @@ def main():
         pygame.display.flip()
         clock.tick(60)
 
-    running = False
-    spawner_thread.join()
-    pygame.quit()
+    # ✅ Skip pygame.quit() in browser
+    if "pyodide" not in sys.modules:
+        pygame.quit()
+    print("Game ended.")
 
 if __name__ == "__main__":
     main()
