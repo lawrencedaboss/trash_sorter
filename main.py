@@ -8,8 +8,7 @@ async def main():
     ASSET_IMG_PATH = os.path.join(SCRIPT_DIR, "assets", "images")
     ASSET_AUDIO_PATH = os.path.join(SCRIPT_DIR, "assets", "audio")
 
-    # Load audio paths (play after user click)
-    bg_music_path = os.path.join(ASSET_AUDIO_PATH, "elevator_music.ogg")  # Use OGG for pygbag
+    bg_music_path = os.path.join(ASSET_AUDIO_PATH, "elevator_music.ogg")
     x_sound = pygame.mixer.Sound(os.path.join(ASSET_AUDIO_PATH, "Incorrect_sound.ogg"))
     check_sound = pygame.mixer.Sound(os.path.join(ASSET_AUDIO_PATH, "Correct_sound.ogg"))
 
@@ -19,7 +18,8 @@ async def main():
         "apple_core.png": "compost",
         "can.png": "recycle",
         "cardboard_box.png": "recycle",
-        "pizza_box.png": "trash"
+        "pizza_box.png": "trash",
+        "old_shoe.png": "trash"  # new trash item for variety
     }
     trash_item_choice = {i + 1: key for i, key in enumerate(trash_item)}
 
@@ -122,7 +122,7 @@ async def main():
                 if game:
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         for item in reversed(items):
-                            if item["rect"].collidepoint(event.pos):
+                            if item["rect"].colliderect(event.pos):
                                 item["dragging"] = True
                                 mouse_x, mouse_y = event.pos
                                 item["offset_x"] = item["rect"].x - mouse_x
@@ -192,7 +192,7 @@ async def main():
 
         pygame.display.flip()
         clock.tick(60)
-        await asyncio.sleep(0)  # This keeps browser build responsive
+        await asyncio.sleep(0)
 
     if "pyodide" not in sys.modules:
         pygame.quit()
