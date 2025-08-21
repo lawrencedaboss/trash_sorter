@@ -19,7 +19,7 @@ async def main():
         "can.png": "recycle",
         "cardboard_box.png": "recycle",
         "pizza_box.png": "trash",
-        "old_shoe.png": "trash"  # new trash item for variety
+       # "old_shoe.png": "trash"   new trash item for variety
     }
     trash_item_choice = {i + 1: key for i, key in enumerate(trash_item)}
 
@@ -122,7 +122,7 @@ async def main():
                 if game:
                     if event.type == pygame.MOUSEBUTTONDOWN:
                         for item in reversed(items):
-                            if item["rect"].colliderect(event.pos):
+                            if item["rect"].collidepoint(event.pos):
                                 item["dragging"] = True
                                 mouse_x, mouse_y = event.pos
                                 item["offset_x"] = item["rect"].x - mouse_x
