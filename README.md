@@ -4,7 +4,7 @@
 
 ## 🌐 Play Now
 
-👉 [Launch the Game on GitHub Pages](https://lawrencedaboss.github.io/trash_sorter_game/)  
+👉 [Launch the Game on GitHub Pages](https://lawrencedaboss.github.io/trash_sorter/)  
 
 ## 🧠 Key Features
 
